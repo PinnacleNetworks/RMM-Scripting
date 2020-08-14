@@ -20,50 +20,37 @@ $FType = "wav"
 $FTypeNew = "aac"
 $extensions =
 @{
-    '999' = 'email';
-    '201' = 'email';
-    '202' = 'email';
-    '203' = 'email';
-    '204' = 'email';
-    '205' = 'email';
-    '206' = 'email';
-    '208' = 'email';
-    '209' = 'email';
-    '210' = 'email';
-    '211' = 'email';
-    '212' = 'email';
-    '213' = 'email';
-    '214' = 'email';
-    '215' = 'email';
+      '999' = '<email>';
+
 }
 $Recordings = Get-ChildItem -Path $SourceFolder -Filter *.$FType -Recurse
 ForEach ($Recording in $Recordings) {
     $Date = Get-Date
-    $FileDate = $_.LastWriteTime
+    $FileDate = $Recording.LastWriteTime
     $Duration = $Date - $FileDate
     $DurationTotal = $Duration.TotalMinutes
     if ($DurationTotal -lt 5) { Continue }
     Try {
-        $Base = Join-Path $_.DirectoryName $_.BaseName
+        $Base = Join-Path $Recording.DirectoryName $Recording.BaseName
         $OldRecording = $Base + ".$FType"
         $NewRecording = $Base + ".$FTypeNew"
-        Start-Process "ffmpeg" -arguementlist  "-i $OldRecording $NewRecording" -Wait
+        Start-Process -FilePath "C:\Scripts\ffmpeg\bin\ffmpeg.exe" -ArgumentList  "-i $OldRecording $NewRecording" -Wait
         LogWrite "$(Get-TimeStamp) Converted $($_.FullName) Successfully"
         #Splitting the Filename so we can use the pieces to extract information for later use
         #NameArray[0] contiains the datestamp in the first 8 characters
         #NameArray[2] contains the caller id of the source
         #NameArray[3] contains the destination internal extension
-        $NameArray = $($_.BaseName).Split($delim)
+        $NameArray = $($Recording.BaseName).Split($delim)
         $EmailAddress = $extensions[$NameArray[3]]
         $FirstNameArray = $emailAddress.Split($delim2)
         $SMTPProperties =
         @{
             To         = $EmailAddress
-            From       = '<emailaddress>'
+            From       = '<email>'
             Body       = 'New Call Recording'
             BodyAsHtml = $true
             Subject    = "Call Recording on $($NameArray[0].substring(0,8)) from ($NameArray[2]) to $FirstNameArray[0]"
-            smtpserver = '<emailserver>'
+            smtpserver = '<mailserver>'
             attachment = $NewRecording
             Port       = '25'
         }
@@ -80,19 +67,16 @@ ForEach ($Recording in $Recordings) {
             LogWrite "$(Get-TimeStamp) Sent Recording $NewRecording to $emailaddress"
             Move-Item -Path $NewRecording -Destination $DestinationSubFolder
             LogWrite "$(Get-TimeStamp) Moved Recording $NewRecording for $NameArray[3] to Processed Folder"
-        }
-        Then {
-                if (Test-Path -Path $NewRecording) {Remove-Item $OldRecording -force}
-                LogWrite "$(Get-TimeStamp) Successfully removed $Recording from Source Folder"
+            Remove-Item $OldRecording -force
+            LogWrite "$(Get-TimeStamp) Successfully removed $Recording from Source Folder"
         }
     }
     Catch {
         LogWrite "$(Get-TimeStamp) Error Converting $($_.FullName):$($_.Exception.Message)"
     }
-    Catch {
-        LogWrite "$(Get-TimeStamp) Error Processing $($NewRecording.FullName): $($_.Exception.Message)"
+    #Catch {
+    #    LogWrite "$(Get-TimeStamp) Error Processing $($NewRecording.FullName): $($_.Exception.Message)"
     }
-    Catch {
-            LogWrite "$(Get-TimeStamp) Error removing old Recording $($Recording.FullName): $($_.Exception.Message)"
-        }
-}
+    #Catch {
+     #   LogWrite "$(Get-TimeStamp) Error removing old Recording $($Recording.FullName): $($_.Exception.Message)"
+   #     }
